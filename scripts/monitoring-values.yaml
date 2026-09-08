@@ -6,6 +6,9 @@ grafana:
 
 prometheus:
   enabled: true
+  serviceMonitorSelectorNilUsesHelmValues: false
+  serviceMonitoringNamspaceSeletor: {}
+  serviceMonitoringSelector: {}
 
   service:
     type: ClusterIP

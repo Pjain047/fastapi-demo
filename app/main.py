@@ -3,6 +3,7 @@ from app.routes import router as task_router
 from app.config import get_settings
 from app.logger import configure_logging, get_logger
 from app.middleware import request_logging_middleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # To create a virtual environment, run "python -m venv .venv" in the terminal.
 # and then to activate it run "source ..\.venv\Scripts\Activate.ps1" in terminal
@@ -22,6 +23,22 @@ app = FastAPI(
     version=settings.app_version,
     debug=settings.debug,
 )
+
+# adding the prometheus metrics settings
+
+if settings.metrics_enabled:
+    Instrumentator(
+        excluded_handlers=[
+            "/health",
+            "/metrics",
+            "/docs",
+            "/openapi.json",
+        ]
+    ).instrument(app).expose(
+        app,
+        endpoint="/metrics",
+        include_in_schema=False
+    )
 
 # Add middleware for request logging
 app.middleware("http")(request_logging_middleware)

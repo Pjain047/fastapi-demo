@@ -16,9 +16,12 @@ class Settings(BaseSettings):
     port: int = 8000
 
     log_level: Literal["debug", "info", "warning", "error", "critical"] = "info"
+   
+    metrics_enabled: bool = True
 
     demo_api_key: str | None = None
     demo_username: str | None = None
+
     @field_validator("log_level", mode="before")
     @classmethod
     def normalize_log_level(cls, value: str) -> str:

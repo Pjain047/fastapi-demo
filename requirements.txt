@@ -4,3 +4,4 @@ pydantic
 pydantic-settings
 python-json-logger
 python-dotenv
+prometheus-fastapi-instrumentator==8.1.0
