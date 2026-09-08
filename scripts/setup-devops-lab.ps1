@@ -86,6 +86,31 @@ if (-not $SkipIngress) {
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to enable the Minikube ingress addon."
     }
+
+    # Install the Gateway API CRDs (standard channel) so Gateway/HTTPRoute resources work.
+    Write-Host "Installing Gateway API CRDs..." -ForegroundColor Cyan
+    kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[WARNING] Failed to install Gateway API CRDs." -ForegroundColor Yellow
+    } else {
+        Write-Host "[OK] Gateway API CRDs installed." -ForegroundColor Green
+    }
+
+    # Install NGINX Gateway Fabric: the Gateway API controller that creates the
+    # 'nginx' GatewayClass and programs routes for Gateway/HTTPRoute resources.
+    Write-Host "Installing NGINX Gateway Fabric (Gateway API controller)..." -ForegroundColor Cyan
+    kubectl create namespace nginx-gateway --dry-run=client -o yaml | kubectl apply -f - 2>&1 | Out-Null
+    helm upgrade --install ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric `
+        --namespace nginx-gateway `
+        --wait `
+        --timeout 5m 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[WARNING] Failed to install NGINX Gateway Fabric." -ForegroundColor Yellow
+    } else {
+        Write-Host "[OK] NGINX Gateway Fabric installed." -ForegroundColor Green
+    }
 }
 
 foreach ($namespace in @("argocd", "fastapi-demo")) {

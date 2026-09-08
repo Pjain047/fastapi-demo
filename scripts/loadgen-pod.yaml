@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: loadgen
+  namespace: fastapi-demo
+  labels:
+    app: loadgen
+spec:
+  restartPolicy: Never
+  containers:
+    - name: loadgen
+      image: curlimages/curl
+      command: ["sh", "/scripts/loadgen.sh"]
+      volumeMounts:
+        - name: script
+          mountPath: /scripts
+  volumes:
+    - name: script
+      configMap:
+        name: loadgen-script
