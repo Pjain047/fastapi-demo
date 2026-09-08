@@ -19,6 +19,9 @@ dist/
 # Test and coverage output
 .pytest_cache/
 .coverage
+coverage.xml
+junit.xml
+report/
 htmlcov/
 
 # Logs

@@ -1,10 +1,9 @@
 from fastapi import APIRouter, HTTPException, Request
-from app.models import TaskCreate, TaskUpdate, TaskResponse
-
+from app.models import TaskCreate, TaskResponse, TaskUpdate
 from app.logger import get_logger
-from app.data import tasks, task_id_counter
+from app import data
 
-# client => router => In memory data store => response to client
+# Client -> router -> in-memory data store -> response to client.
 
 logger = get_logger(__name__)
 
@@ -21,21 +20,19 @@ router = APIRouter(
     summary="Create a new task",
 )
 async def create_task(task: TaskCreate) -> TaskResponse:
-    global task_id_counter
-
     logger.info(
         "Creating a new task",
         extra={"task_title": task.title},
     )
 
     new_task = TaskResponse(
-        id=task_id_counter,
+        id=data.task_id_counter,
         title=task.title,
         description=task.description,
         completed=False,
     )
-    tasks.append(new_task)
-    task_id_counter += 1
+    data.tasks.append(new_task)
+    data.task_id_counter += 1
     return new_task
 
 @router.get(
@@ -44,8 +41,8 @@ async def create_task(task: TaskCreate) -> TaskResponse:
     summary="Get all tasks",
 )
 async def get_tasks() -> list[TaskResponse]:
-    logger.info("Fetching all tasks",extra={"task_count": len(tasks)})
-    return tasks
+    logger.info("Fetching all tasks", extra={"task_count": len(data.tasks)})
+    return data.tasks
 
 @router.get(
     "/{task_id}",
@@ -53,7 +50,7 @@ async def get_tasks() -> list[TaskResponse]:
     summary="Get a task by ID",
 )
 async def get_task(request: Request, task_id: int) -> TaskResponse:
-    for task in tasks:
+    for task in data.tasks:
         if task.id == task_id:
             logger.info("Fetching task", extra={
                 "task_id": task_id,
@@ -69,7 +66,7 @@ async def get_task(request: Request, task_id: int) -> TaskResponse:
     summary="Update a task by ID",
 )
 async def update_task(task_id: int, task_update: TaskUpdate) -> TaskResponse:
-    for task in task:
+    for task in data.tasks:
         if task.id == task_id:
             if task_update.title is not None:
                 task.title = task_update.title
@@ -86,9 +83,9 @@ async def update_task(task_id: int, task_update: TaskUpdate) -> TaskResponse:
     summary="Delete a task by ID",
 )
 async def delete_task(task_id: int) -> dict[str, str]:
-    for task in tasks:
+    for task in data.tasks:
         if task.id == task_id:
-            tasks.remove(task)
+            data.tasks.remove(task)
             logger.info("Task deleted", extra={"task_id": task_id})
             return {"message": "Task deleted successfully"}
     logger.warning("Task not found", extra={"task_id": task_id})
