@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Read application settings from environment variables or the .env file.
@@ -18,11 +19,15 @@ class Settings(BaseSettings):
 
     demo_api_key: str | None = None
     demo_username: str | None = None
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def normalize_log_level(cls, value: str) -> str:
+        return value.lower()
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
     )
 

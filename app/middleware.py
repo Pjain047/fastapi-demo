@@ -29,7 +29,7 @@ async def request_logging_middleware(
             "http_method": request.method,
             "path": request.url.path,
             "query_params": request.url.query or None,
-                "client_ip": client_ip,
+              "client_ip": client_ip,
         },
     )
 

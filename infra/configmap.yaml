@@ -11,4 +11,4 @@ immutable: true
 data:
   ENVIRONMENT: "minikube"
   LOG_LEVEL: "DEBUG"
-  Version: "1.1.0"
+  APP_VERSION: "1.1.0"
