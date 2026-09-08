@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
-# create models with uts fields and validation using pydantic
+# Create models with typed fields and validation using Pydantic.
 
 class TaskCreate(BaseModel):
     title: str = Field(
