@@ -42,6 +42,13 @@ Each workflow run also publishes a GitHub Actions summary and a downloadable
 `ci-report` HTML artifact containing test totals, coverage, SonarCloud status,
 Docker push status, image link, and workflow details.
 
+Branch behavior:
+
+- `main` pushes run tests, coverage, SonarCloud, reporting, and Docker Hub publishing.
+- `bugfix/**` pushes run tests, coverage, SonarCloud, reporting, and Docker Hub publishing.
+- `feature/**` pushes and pull requests run validation, coverage, SonarCloud, and reporting without Docker publishing.
+- Merging a pull request into `main` creates a `main` push and runs the full pipeline, including Docker publishing.
+
 Required GitHub repository secrets:
 
 ```text

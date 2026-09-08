@@ -2,8 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - "bugfix/**"
+      - "feature/**"
   pull_request:
+    branches:
+      - main
+      - "bugfix/**"
+      - "feature/**"
   workflow_dispatch:
 
 permissions:
@@ -55,7 +62,9 @@ jobs:
   docker:
     name: Build and publish Docker image
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/bugfix/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
