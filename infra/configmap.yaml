@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fastapi-demo-config
+  namespace: fastapi-demo
+  labels:
+    app: fastapi-demo
+
+immutable: true
+
+data:
+  ENVIRONMENT: "minikube"
+  LOG_LEVEL: "DEBUG"
+  Version: "1.1.0"
