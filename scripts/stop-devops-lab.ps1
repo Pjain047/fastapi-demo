@@ -13,6 +13,26 @@ if (Test-Path $closeScript) {
     & $closeScript
 }
 
+# Stop any running minikube tunnel before stopping the cluster so no
+# orphaned tunnel window/process is left behind.
+Write-Host ""
+Write-Host "Stopping minikube tunnel (if running)..." -ForegroundColor Cyan
+
+$tunnel = Get-CimInstance Win32_Process `
+    -Filter "Name = 'minikube.exe'" `
+    -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match '\btunnel\b' }
+
+if ($tunnel) {
+    $tunnel | ForEach-Object {
+        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    Write-Host "[OK] minikube tunnel stopped." -ForegroundColor Green
+}
+else {
+    Write-Host "[SKIP] No minikube tunnel running." -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "Stopping Minikube profile '$Profile'..." `
     -ForegroundColor Cyan

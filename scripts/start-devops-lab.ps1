@@ -76,6 +76,39 @@ Write-Host ""
 Write-Host "Argo Cd status:" -ForegroundColor Cyan
 kubectl get pods --namespace argocd
 
+# Start a minikube tunnel so LoadBalancer services (the Gateway's data-plane)
+# get an external IP on 127.0.0.1 and the nip.io hostname becomes reachable.
 Write-Host ""
+Write-Host "Starting minikube tunnel for LoadBalancer/Gateway access..." -ForegroundColor Cyan
+
+# A tunnel is needed only if the Gateway LB has no external IP assigned yet.
+$gatewayIp = kubectl get svc fastapi-demo-nginx -n fastapi-demo `
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+
+if (-not [string]::IsNullOrWhiteSpace($gatewayIp)) {
+    Write-Host "[SKIP] Gateway already has external IP ($gatewayIp) - tunnel likely running." -ForegroundColor Yellow
+}
+else {
+    Start-Process -FilePath "minikube" `
+        -ArgumentList "tunnel", "-p", $ClusterName `
+        -WindowStyle Minimized
+
+    # Give the tunnel a moment to assign external IPs.
+    Start-Sleep -Seconds 5
+
+    $gatewayIp = kubectl get svc fastapi-demo-nginx -n fastapi-demo `
+        -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+
+    if (-not [string]::IsNullOrWhiteSpace($gatewayIp)) {
+        Write-Host "[OK] Tunnel started. Gateway external IP: $gatewayIp" -ForegroundColor Green
+    }
+    else {
+        Write-Host "[WARNING] Tunnel started but Gateway has no external IP yet." -ForegroundColor Yellow
+        Write-Host "          If port 80 fails, run 'minikube tunnel' from an elevated terminal." -ForegroundColor Yellow
+    }
+}
+
+Write-Host ""
+Write-Host "App URL (via Gateway): http://fastapi-demo.127.0.0.1.nip.io/docs" -ForegroundColor Green
 Write-Host "[OK] DevOps lab is ready" -ForegroundColor Green
 
