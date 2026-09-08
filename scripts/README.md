@@ -259,7 +259,41 @@ Use a custom profile:
 .\scripts\start-devops-lab.ps1 -ClusterName minikube
 ```
 
-## 9. Roll back a Helm release
+## 9. Install Kubernetes Metrics Server
+
+The Horizontal Pod Autoscaler (HPA) requires the metrics-server to collect CPU and memory metrics. This is now automatically installed during `setup-devops-lab.ps1`, but you can run it separately if needed:
+
+```powershell
+.\scripts\install-metrics-server.ps1
+```
+
+The metrics server installation:
+
+- Checks if Minikube is running
+- Enables the metrics-server addon (on Minikube)
+- Verifies the deployment is ready
+- Waits for metrics to be collected
+
+Use a custom cluster name:
+
+```powershell
+.\scripts\install-metrics-server.ps1 -ClusterName my-cluster
+```
+
+Verify metrics are working:
+
+```powershell
+kubectl top nodes
+kubectl top pods -n fastapi-demo
+```
+
+If HPA shows "unable to get metrics" errors, wait a few minutes for metrics collection to initialize, then check the metrics-server logs:
+
+```powershell
+kubectl logs -f deployment/metrics-server -n kube-system
+```
+
+## 10. Roll back a Helm release
 
 List revisions:
 
@@ -276,7 +310,7 @@ helm rollback fastapi-demo <REVISION> `
   --timeout 5m
 ```
 
-## 10. Remove the application
+## 11. Remove the application
 
 Remove only the Helm-managed FastAPI resources:
 
@@ -290,7 +324,7 @@ The namespace remains. Remove it separately only when required:
 kubectl delete namespace fastapi-demo
 ```
 
-## 11. Remove the complete local lab
+## 12. Remove the complete local lab
 
 To remove the application, Argo CD, namespaces, and Minikube profile:
 
@@ -308,11 +342,12 @@ Use `minikube delete` only when you want to remove the entire local cluster.
 
 | Script | Purpose |
 | --- | --- |
-| `setup-devops-lab.ps1` | First-time setup of Minikube, namespaces, Ingress, and Argo CD |
+| `setup-devops-lab.ps1` | First-time setup of Minikube, namespaces, Ingress, Argo CD, and metrics-server |
 | `start-devops-lab.ps1` | Start an existing Minikube profile |
 | `status-devops-lab.ps1` | Display cluster, Argo CD, application, and Helm status |
 | `open-argocd.ps1` | Read the Argo CD password and start local port forwarding |
 | `stop-devops-lab.ps1` | Stop Minikube without deleting resources |
+| `install-metrics-server.ps1` | Install or verify Kubernetes metrics-server for HPA |
 
 ## Troubleshooting
 

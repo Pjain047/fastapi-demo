@@ -86,3 +86,137 @@ helm upgrade --install fastapi-demo .\helm_infra\fastapi-demo `
 The namespace template is optional and disabled by default. `--create-namespace`
 creates the namespace before Helm installs the namespaced resources. Use
 `--wait` to wait for workloads to become ready.
+
+## DevOps Lab Setup with Kubernetes & ArgoCD
+
+This project includes a complete DevOps lab setup for deploying on Kubernetes with ArgoCD (GitOps).
+
+### Quick Start - Setup DevOps Lab
+
+Run the automated setup script to initialize everything:
+
+```powershell
+.\scripts\setup-devops-lab.ps1
+```
+
+This script will:
+- ✅ Verify Docker, kubectl, and Minikube are installed
+- ✅ Start Minikube cluster
+- ✅ Create required namespaces (`argocd` and `fastapi-demo`)
+- ✅ Install ArgoCD
+- ✅ Install Kubernetes metrics-server (required for HPA autoscaling)
+- ✅ Wait for all components to be ready
+
+**Optional parameters:**
+
+```powershell
+# Custom cluster name, driver, CPU, and memory
+.\scripts\setup-devops-lab.ps1 -ClusterName my-cluster -Driver docker -CpuCount 6 -MemorySize 16384
+
+# Skip Ingress addon setup
+.\scripts\setup-devops-lab.ps1 -SkipIngress
+```
+
+### Individual Setup Scripts
+
+If you need to run components separately:
+
+```powershell
+# Start Minikube and install ArgoCD
+.\scripts\setup-devops-lab.ps1 -SkipIngress
+
+# Install or verify metrics-server (for Horizontal Pod Autoscaler)
+.\scripts\install-metrics-server.ps1
+
+# Access ArgoCD UI
+.\scripts\open-argocd.ps1
+
+# Check cluster status
+.\scripts\status-devops-lab.ps1
+
+# Stop the cluster
+.\scripts\stop-devops-lab.ps1
+
+# Start the cluster again
+.\scripts\start-devops-lab.ps1
+```
+
+### Deploying with ArgoCD (GitOps)
+
+Once the DevOps lab is set up, the application is deployed via ArgoCD from the `fastapi-demo-gitops` repository:
+
+1. Navigate to the GitOps repository:
+   ```powershell
+   cd ../fastapi-demo-gitops
+   ```
+
+2. Apply the ArgoCD Application:
+   ```powershell
+   kubectl apply -f argocd/application.yaml
+   ```
+
+3. Verify deployment:
+   ```powershell
+   kubectl get application -n argocd
+   kubectl get pods -n fastapi-demo
+   ```
+
+4. Access the application:
+   ```powershell
+   # Get the service details
+   kubectl get svc -n fastapi-demo
+   
+   # Access via NodePort (e.g., http://<node-ip>:30000)
+   ```
+
+See [../fastapi-demo-gitops/README.md](../fastapi-demo-gitops/README.md) for complete ArgoCD and GitOps documentation.
+
+### Monitoring and Debugging
+
+```powershell
+# View cluster nodes and resource usage
+kubectl top nodes
+kubectl top pods -n fastapi-demo
+
+# Check HPA status
+kubectl get hpa -n fastapi-demo
+kubectl describe hpa fastapi-demo -n fastapi-demo
+
+# View application logs
+kubectl logs -f deployment/fastapi-demo -n fastapi-demo
+
+# Check ArgoCD application status
+argocd app list
+argocd app describe fastapi-demo
+
+# Access ArgoCD UI (opens browser automatically)
+.\scripts\open-argocd.ps1
+```
+
+### Troubleshooting
+
+**Metrics Server Not Ready:**
+If HPA shows "unable to get metrics" errors, the metrics-server may still be initializing. Wait a few minutes for metrics to be collected:
+
+```powershell
+# Check metrics-server logs
+kubectl logs -f deployment/metrics-server -n kube-system
+
+# Re-run the metrics server installation
+.\scripts\install-metrics-server.ps1
+```
+
+**Application Not Syncing:**
+ArgoCD syncs every 3 minutes by default. To force an immediate sync:
+
+```powershell
+argocd app sync fastapi-demo
+```
+
+**Cluster Resources Low:**
+Increase Minikube resources:
+
+```powershell
+minikube stop
+minikube start --cpus=6 --memory=16384
+```

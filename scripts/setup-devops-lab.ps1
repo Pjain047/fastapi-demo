@@ -228,6 +228,16 @@ if ($LASTEXITCODE -ne 0){
 Write-Host "[OK] All Argo cd pods are ready." -ForegroundColor Green
 
 
+Write-Step "Installing Metrics Server"
+
+# Call metrics-server installation script
+& "$(Split-Path $PSCommandPath)\install-metrics-server.ps1" -ClusterName $ClusterName
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[WARNING] Metrics server installation encountered issues." -ForegroundColor Yellow
+}
+
+
 Write-Step "DevOps Lab setup completed"
 
 Write-Host "Minikube cluster: $ClusterName"
