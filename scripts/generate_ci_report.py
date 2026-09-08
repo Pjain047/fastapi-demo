@@ -51,6 +51,7 @@ def main() -> int:
 
     test_result = os.environ.get("TEST_RESULT", "unknown")
     docker_result = os.environ.get("DOCKER_RESULT", "skipped")
+    helm_result = os.environ.get("HELM_RESULT", "unknown")
     sonar_result = os.environ.get("SONAR_RESULT", "unknown")
     tests = read_junit(report_path("junit.xml"))
     coverage = read_coverage(report_path("coverage.xml"))
@@ -74,6 +75,7 @@ def main() -> int:
 | Line coverage | {coverage} |
 | SonarCloud | {status_label(sonar_result)} |
 | Docker build and push | {status_label(docker_result)} |
+| Helm validation | {status_label(helm_result)} |
 | Docker image | [{image}]({docker_url}) |
 | SonarCloud project | [Open project]({sonar_url}) |
 | Workflow run | [Open run]({run_url}) |
@@ -94,6 +96,7 @@ The full HTML report is available in the `ci-report` workflow artifact.
             ("Line coverage", html.escape(coverage)),
             ("SonarCloud", f'<a href="{html.escape(sonar_url)}">{html.escape(status_label(sonar_result))}</a>'),
             ("Docker build and push", html.escape(status_label(docker_result))),
+            ("Helm validation", html.escape(status_label(helm_result))),
             ("Docker image", f'<a href="{html.escape(docker_url)}">{html.escape(image)}</a>'),
             ("SonarCloud project", f'<a href="{html.escape(sonar_url)}">Open project</a>'),
             ("Workflow run", f'<a href="{html.escape(run_url)}">Open run</a>'),

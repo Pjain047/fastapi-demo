@@ -40,7 +40,7 @@ on pushes to `main`.
 
 Each workflow run also publishes a GitHub Actions summary and a downloadable
 `ci-report` HTML artifact containing test totals, coverage, SonarCloud status,
-Docker push status, image link, and workflow details.
+Docker push status, Helm validation status, image link, and workflow details.
 
 Branch behavior:
 
@@ -58,3 +58,31 @@ SONAR_TOKEN
 ```
 
 SonarCloud organization: `pjain047`
+
+## Helm deployment
+
+The full Helm runbook is in [helm_infra/README.md](helm_infra/README.md).
+The chart is in `helm_infra/fastapi-demo`. Install it into the `fastapi-demo`
+namespace with Helm creating the namespace before the release:
+
+```powershell
+helm upgrade --install fastapi-demo .\helm_infra\fastapi-demo `
+	--namespace fastapi-demo `
+	--create-namespace `
+	--wait
+```
+
+For a local Minikube deployment, the chart defaults to the values in
+`helm_infra/fastapi-demo/values.yaml`. Override values without editing the
+chart, for example:
+
+```powershell
+helm upgrade --install fastapi-demo .\helm_infra\fastapi-demo `
+	--namespace fastapi-demo `
+	--create-namespace `
+	--set image.tag=latest
+```
+
+The namespace template is optional and disabled by default. `--create-namespace`
+creates the namespace before Helm installs the namespaced resources. Use
+`--wait` to wait for workloads to become ready.
