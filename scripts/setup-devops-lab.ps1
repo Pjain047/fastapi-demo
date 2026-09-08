@@ -189,8 +189,10 @@ if (-not $SkipMonitoring) {
         }
 
         # Install kube-prometheus-stack
+        $monitoringValuesPath = Join-Path $PSScriptRoot "monitoring-values.yaml"
         helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack `
             --namespace monitoring `
+            -f $monitoringValuesPath `
             --set prometheus.prometheusSpec.retention=24h `
             --set grafana.adminPassword=admin `
             --wait `

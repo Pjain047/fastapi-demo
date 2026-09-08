@@ -6,15 +6,16 @@ grafana:
 
 prometheus:
   enabled: true
-  serviceMonitorSelectorNilUsesHelmValues: false
-  serviceMonitorNamespaceSelector: {}
-  serviceMonitorSelector: {}
 
   service:
     type: ClusterIP
 
   prometheusSpec:
     retention: 2d
+    # Discover ServiceMonitors from ALL namespaces (not just "monitoring")
+    serviceMonitorNamespaceSelector: {}
+    # Do NOT restrict to ServiceMonitors with the Helm release label
+    serviceMonitorSelectorNilUsesHelmValues: false
 
 alertmanager:
   enabled: true
