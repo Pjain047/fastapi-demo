@@ -32,6 +32,14 @@ $endpoints = @(
         LocalPort = 9090
         RemotePort = 9090
         Url = "http://localhost:9090"
+    },
+    @{
+        Name = "Kiali"
+        Namespace = "istio-system"
+        Service = "kiali"
+        LocalPort = 20001
+        RemotePort = 20001
+        Url = "http://localhost:20001/kiali"
     }
 )
 
@@ -291,6 +299,19 @@ if ($monitoringEnabled) {
     Write-Host ""
     Write-Host "Monitoring (Grafana/Prometheus)" -ForegroundColor Yellow
     Write-Host "[SKIP] monitoring namespace not found - not configured"
+}
+
+# Kiali (service mesh dashboard) - only if Istio is installed
+$istioEnabled = Test-NamespaceExists -Namespace "istio-system"
+if ($istioEnabled) {
+    Write-Host ""
+    Write-Host "Kiali (Service Mesh)" -ForegroundColor Green
+    Write-Host "URL            : http://localhost:20001/kiali"
+    Write-Host "Authentication : Anonymous (no login - local lab only)"
+} else {
+    Write-Host ""
+    Write-Host "Kiali (Service Mesh)" -ForegroundColor Yellow
+    Write-Host "[SKIP] istio-system namespace not found - Istio not installed"
 }
 
 Write-Host ""

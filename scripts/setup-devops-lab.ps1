@@ -5,7 +5,8 @@ param(
     [int]$CpuCount = 4,
     [int]$MemorySize = 8192,
     [switch]$SkipIngress,
-    [switch]$SkipMonitoring
+    [switch]$SkipMonitoring,
+    [switch]$SkipIstio
 )
 
 $ErrorActionPreference = "Stop"
@@ -247,6 +248,82 @@ if (-not $SkipMonitoring) {
 } else {
     Write-Host "" 
     Write-Host "[SKIP] Monitoring stack installation skipped." -ForegroundColor Yellow
+}
+
+if (-not $SkipIstio) {
+    Write-Host ""
+    Write-Host "Installing Istio service mesh..." -ForegroundColor Cyan
+
+    helm repo add istio https://istio-release.storage.googleapis.com/charts 2>&1 | Out-Null
+    helm repo update 2>&1 | Out-Null
+
+    kubectl create namespace istio-system --dry-run=client -o yaml | kubectl apply -f - 2>&1 | Out-Null
+
+    # 1. Istio base: CRDs and cluster-scoped resources.
+    Write-Host "Installing Istio base (CRDs)..." -ForegroundColor Cyan
+    helm upgrade --install istio-base istio/base `
+        --namespace istio-system `
+        --wait `
+        --timeout 5m 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install Istio base."
+    }
+
+    # 2. istiod: the control plane.
+    Write-Host "Installing istiod (control plane)..." -ForegroundColor Cyan
+    helm upgrade --install istiod istio/istiod `
+        --namespace istio-system `
+        --wait `
+        --timeout 5m 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install istiod."
+    }
+
+    # 3. Istio ingress gateway: the data-plane entrypoint for mesh traffic.
+    Write-Host "Installing Istio ingress gateway..." -ForegroundColor Cyan
+    helm upgrade --install istio-ingressgateway istio/gateway `
+        --namespace istio-system `
+        --wait `
+        --timeout 5m 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install the Istio ingress gateway."
+    }
+
+    Write-Host "[OK] Istio service mesh installed." -ForegroundColor Green
+
+    # Enable automatic sidecar (Envoy proxy) injection for the app namespace.
+    Write-Host "Enabling Istio sidecar injection on the 'fastapi-demo' namespace..." -ForegroundColor Cyan
+    kubectl label namespace fastapi-demo istio-injection=enabled --overwrite 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[OK] Sidecar injection enabled for 'fastapi-demo'." -ForegroundColor Green
+    } else {
+        Write-Host "[WARNING] Failed to label 'fastapi-demo' for sidecar injection." -ForegroundColor Yellow
+    }
+
+    # 4. Kiali: the service-mesh observability dashboard.
+    Write-Host "Installing Kiali (service mesh dashboard)..." -ForegroundColor Cyan
+    helm repo add kiali https://kiali.org/helm-charts 2>&1 | Out-Null
+    helm repo update 2>&1 | Out-Null
+
+    helm upgrade --install kiali-server kiali/kiali-server `
+        --namespace istio-system `
+        --set auth.strategy="anonymous" `
+        --set external_services.prometheus.url="http://kube-prometheus-stack-prometheus.monitoring:9090" `
+        --wait `
+        --timeout 5m 2>&1 | Out-Null
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "[OK] Kiali installed (anonymous auth - local lab only)." -ForegroundColor Green
+    } else {
+        Write-Host "[WARNING] Failed to install Kiali." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host ""
+    Write-Host "[SKIP] Istio installation skipped." -ForegroundColor Yellow
 }
 
 Write-Host "" 
