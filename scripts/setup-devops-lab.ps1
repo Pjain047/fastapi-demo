@@ -4,12 +4,13 @@ param(
     [string]$Driver = "docker",
     [int]$CpuCount = 4,
     [int]$MemorySize = 8192,
-    [switch]$SkipIngress
+    [switch]$SkipIngress,
+    [switch]$SkipMonitoring
 )
 
 $ErrorActionPreference = "Stop"
 
-foreach ($commandName in @("minikube", "kubectl")) {
+foreach ($commandName in @("minikube", "kubectl", "helm")) {
     if (-not (Get-Command $commandName -ErrorAction SilentlyContinue)) {
         throw "Required command '$commandName' was not found in PATH."
     }
@@ -97,10 +98,43 @@ foreach ($namespace in @("argocd", "fastapi-demo")) {
 
 Write-Host "" 
 Write-Host "Installing Argo CD..." -ForegroundColor Cyan
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to install Argo CD."
+$ArgoInstallUrl = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
+$retryCount = 0
+$maxRetries = 3
+$installed = $false
+
+while ($retryCount -lt $maxRetries -and -not $installed) {
+    Write-Host "Attempting Argo CD installation (attempt $($retryCount + 1) of $maxRetries)..." -ForegroundColor Yellow
+    
+    try {
+        # Use server-side apply to avoid annotation warnings
+        kubectl apply -n argocd --server-side --force-conflicts -f $ArgoInstallUrl 2>&1 | Out-Null
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[OK] Argo CD manifests applied." -ForegroundColor Green
+            $installed = $true
+        }
+        else {
+            $retryCount++
+            if ($retryCount -lt $maxRetries) {
+                Write-Host "Installation attempt failed with exit code $LASTEXITCODE. Retrying in 10 seconds..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 10
+            }
+        }
+    }
+    catch {
+        $retryCount++
+        Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Yellow
+        if ($retryCount -lt $maxRetries) {
+            Write-Host "Retrying in 10 seconds..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 10
+        }
+    }
+}
+
+if (-not $installed) {
+    throw "Failed to install Argo CD after $maxRetries attempts. Check your internet connection and try again."
 }
 
 Write-Host "" 
@@ -134,6 +168,58 @@ kubectl wait `
 
 if ($LASTEXITCODE -ne 0) {
     throw "metrics-server did not become ready in time."
+}
+
+if (-not $SkipMonitoring) {
+    Write-Host "" 
+    Write-Host "Installing monitoring stack (Prometheus & Grafana)..." -ForegroundColor Cyan
+
+    # Add Prometheus Helm repo
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm repo update
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[WARNING] Failed to add Prometheus Helm repo. Monitoring will not be installed." -ForegroundColor Yellow
+    } else {
+        # Create monitoring namespace
+        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create monitoring namespace."
+        }
+
+        # Install kube-prometheus-stack
+        helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack `
+            --namespace monitoring `
+            --set prometheus.prometheusSpec.retention=24h `
+            --set grafana.adminPassword=admin `
+            --wait `
+            --timeout 5m 2>&1 | Out-Null
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[OK] Monitoring stack installed successfully." -ForegroundColor Green
+            
+            # Wait for monitoring to be ready
+            Write-Host "Waiting for monitoring stack to be ready..." -ForegroundColor Cyan
+            kubectl wait `
+                --namespace monitoring `
+                --for=condition=Available `
+                deployment `
+                --all `
+                --timeout=300s 2>&1 | Out-Null
+
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "[OK] Monitoring stack is ready." -ForegroundColor Green
+            } else {
+                Write-Host "[WARNING] Monitoring stack may not be fully ready yet." -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "[WARNING] Failed to install monitoring stack." -ForegroundColor Yellow
+        }
+    }
+} else {
+    Write-Host "" 
+    Write-Host "[SKIP] Monitoring stack installation skipped." -ForegroundColor Yellow
 }
 
 Write-Host "" 

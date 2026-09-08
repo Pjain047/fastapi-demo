@@ -128,8 +128,8 @@ If you need to run components separately:
 # Install or verify metrics-server (for Horizontal Pod Autoscaler)
 .\scripts\install-metrics-server.ps1
 
-# Access ArgoCD UI
-.\scripts\open-argocd.ps1
+# Access all dashboards (Argo CD, Grafana, Prometheus)
+.\scripts\open-devops-lab.ps1
 
 # Check cluster status
 .\scripts\status-devops-lab.ps1

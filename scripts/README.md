@@ -42,7 +42,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 ```powershell
 .\scripts\setup-devops-lab.ps1
 .\scripts\status-devops-lab.ps1
-.\scripts\open-argocd.ps1
+.\scripts\open-devops-lab.ps1
 ```
 
 ## Script details
@@ -55,20 +55,23 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 The setup script now:
 
-- validates Minikube and kubectl are available
+- validates Minikube, kubectl, and Helm are available
 - starts the target Minikube profile
 - configures the kubectl context
 - waits for all nodes to become ready
 - enables Minikube ingress when not skipped
 - creates `argocd` and `fastapi-demo` namespaces
 - installs Argo CD into the `argocd` namespace
-- waits for Argo CD and metrics-server to become available
+- installs metrics-server for HPA autoscaling
+- installs monitoring stack (Prometheus & Grafana) unless skipped
+- waits for all components to become available
 
 Optional settings:
 
 ```powershell
 .\scripts\setup-devops-lab.ps1 -Profile minikube -Driver docker -CpuCount 4 -MemorySize 8192
 .\scripts\setup-devops-lab.ps1 -Profile minikube -SkipIngress
+.\scripts\setup-devops-lab.ps1 -SkipMonitoring
 ```
 
 The `-ClusterName` alias is also accepted for compatibility with the older README examples.
@@ -98,14 +101,29 @@ This script prints:
 - Helm releases in `monitoring`
 - HPA state
 
-### 4. Open Argo CD
+### 4. Open DevOps Lab Dashboards (Argo CD, Grafana, Prometheus)
 
 ```powershell
-.\scripts\open-argocd.ps1
-.\scripts\open-argocd.ps1 -LocalPort 9090
+.\scripts\open-devops-lab.ps1
 ```
 
-The script validates that the Argo CD service is available, reads the admin password, and creates a local `kubectl port-forward` to `https://localhost:<port>`.
+This script sets up port-forwarding for all available dashboards:
+
+- **Argo CD** at https://localhost:8080 (Username: admin, Password: from script output)
+- **Grafana** at http://localhost:3000 (Username: admin, Password: admin) - if monitoring is installed
+- **Prometheus** at http://localhost:9090 - if monitoring is installed
+
+The script automatically opens your browser to all available services. To skip browser opening:
+
+```powershell
+.\scripts\open-devops-lab.ps1 -NoBrowser
+```
+
+The port-forward processes run in the background. Close them with:
+
+```powershell
+.\scripts\close-devops-lab.ps1
+```
 
 ### 5. Stop the lab
 
@@ -136,11 +154,11 @@ This script enables the Minikube metrics-server addon when possible and verifies
 
 | Script | Purpose |
 | --- | --- |
-| `setup-devops-lab.ps1` | Start Minikube, create namespaces, install Argo CD, and verify the lab is ready |
+| `setup-devops-lab.ps1` | Start Minikube, create namespaces, install Argo CD, metrics-server, and monitoring (Prometheus & Grafana) |
 | `start-devops-lab.ps1` | Start an existing cluster profile |
 | `status-devops-lab.ps1` | Show cluster and application health |
-| `open-devops-lab.ps1` | Open the local DevOps dashboards and read admin secrets |
-| `open-argocd.ps1` | Open the Argo CD UI directly |
+| `open-devops-lab.ps1` | Open all DevOps dashboards (Argo CD, Grafana, Prometheus) and read admin secrets |
+
 | `close-devops-lab.ps1` | Stop any recorded port-forward processes |
 | `stop-devops-lab.ps1` | Stop Minikube without deleting state |
 | `install-metrics-server.ps1` | Install or verify metrics-server |
@@ -162,6 +180,7 @@ kubectl get nodes
 kubectl get pods -n argocd
 kubectl get pods -n fastapi-demo
 kubectl get deployment metrics-server -n kube-system
+kubectl get pods -n monitoring
 ```
 
 If Argo CD is not ready:
@@ -170,6 +189,47 @@ If Argo CD is not ready:
 kubectl get pods -n argocd
 kubectl describe pods -n argocd
 kubectl get events -n argocd --sort-by=.lastTimestamp
+```
+
+### Monitoring (Prometheus & Grafana)
+
+The monitoring stack is installed by default. To skip monitoring during setup:
+
+```powershell
+.\scripts\setup-devops-lab.ps1 -SkipMonitoring
+```
+
+Check monitoring installation:
+
+```powershell
+kubectl get namespace monitoring
+kubectl get pods -n monitoring
+kubectl get svc -n monitoring
+```
+
+Access monitoring dashboards:
+
+```powershell
+.\scripts\open-devops-lab.ps1
+```
+
+This will open:
+- **Grafana** at http://localhost:3000 (default username/password: admin/admin)
+- **Prometheus** at http://localhost:9090
+
+If monitoring pods are not ready, check the logs:
+
+```powershell
+kubectl logs -f deployment/kube-prometheus-stack-grafana -n monitoring
+kubectl logs -f statefulset/prometheus-kube-prometheus-prometheus -n monitoring
+```
+
+Reinstall monitoring stack if needed:
+
+```powershell
+helm uninstall kube-prometheus-stack -n monitoring
+kubectl delete namespace monitoring
+.\scripts\setup-devops-lab.ps1  # Run setup again
 ```
 
 If metrics are not available:

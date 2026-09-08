@@ -20,7 +20,7 @@ $endpoints = @(
     @{
         Name = "Grafana"
         Namespace = "monitoring"
-        Service = "monitoring-grafana"
+        Service = "kube-prometheus-stack-grafana"
         LocalPort = 3000
         RemotePort = 80
         Url = "http://localhost:3000"
@@ -28,7 +28,7 @@ $endpoints = @(
     @{
         Name = "Prometheus"
         Namespace = "monitoring"
-        Service = "monitoring-kube-prometheus-prometheus"
+        Service = "kube-prometheus-stack-prometheus"
         LocalPort = 9090
         RemotePort = 9090
         Url = "http://localhost:9090"
@@ -68,6 +68,20 @@ function Wait-ForPort {
 }
 
 
+function Test-NamespaceExists {
+    param(
+        [string]$Namespace
+    )
+    
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    kubectl get namespace $Namespace 2>$null | Out-Null
+    $namespaceExists = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $previousErrorActionPreference
+    return $namespaceExists
+}
+
+
 function Convert-SecretValue {
     param(
         [string]$SecretName,
@@ -101,11 +115,8 @@ function Start-PortForward {
         --namespace $Endpoint.Namespace *> $null
 
     if ($LASTEXITCODE -ne 0) {
-        throw @"
-Service '$($Endpoint.Service)' was not found in namespace
-'$($Endpoint.Namespace)'.
-Run setup-devops-lab.ps1 first.
-"@
+        Write-Host "[SKIP] Service '$($Endpoint.Service)' not found in namespace '$($Endpoint.Namespace)'. ($($Endpoint.Name) will not be available)" -ForegroundColor Yellow
+        return $null
     }
 
     if (Test-PortInUse -Port $Endpoint.LocalPort) {
@@ -202,6 +213,12 @@ Write-Host ""
 $processes = @()
 
 foreach ($endpoint in $endpoints) {
+    # Skip endpoints in namespaces that don't exist
+    if (-not (Test-NamespaceExists -Namespace $endpoint.Namespace)) {
+        Write-Host "[SKIP] Namespace '$($endpoint.Namespace)' not found. Skipping $($endpoint.Name)." -ForegroundColor Yellow
+        continue
+    }
+    
     $processInformation = Start-PortForward `
         -Endpoint $endpoint
 
@@ -222,15 +239,27 @@ $argoPassword = Convert-SecretValue `
     -Namespace "argocd" `
     -Key "password"
 
-$grafanaUsername = Convert-SecretValue `
-    -SecretName "monitoring-grafana" `
-    -Namespace "monitoring" `
-    -Key "admin-user"
+# Only fetch monitoring credentials if the namespace exists
+$monitoringEnabled = Test-NamespaceExists -Namespace "monitoring"
+if ($monitoringEnabled) {
+    $grafanaUsername = Convert-SecretValue `
+        -SecretName "kube-prometheus-stack-grafana" `
+        -Namespace "monitoring" `
+        -Key "admin-user"
 
-$grafanaPassword = Convert-SecretValue `
-    -SecretName "monitoring-grafana" `
-    -Namespace "monitoring" `
-    -Key "admin-password"
+    $grafanaPassword = Convert-SecretValue `
+        -SecretName "kube-prometheus-stack-grafana" `
+        -Namespace "monitoring" `
+        -Key "admin-password"
+    
+    # If secrets are not found, use defaults (as set during helm installation)
+    if ($grafanaUsername -eq "Unavailable") {
+        $grafanaUsername = "admin"
+    }
+    if ($grafanaPassword -eq "Unavailable") {
+        $grafanaPassword = "admin"
+    }
+}
 
 
 Write-Host ""
@@ -247,16 +276,22 @@ Write-Host "URL      : https://localhost:8080"
 Write-Host "Username : admin"
 Write-Host "Password : $argoPassword"
 
-Write-Host ""
-Write-Host "Grafana" -ForegroundColor Green
-Write-Host "URL      : http://localhost:3000"
-Write-Host "Username : $grafanaUsername"
-Write-Host "Password : $grafanaPassword"
+if ($monitoringEnabled) {
+    Write-Host ""
+    Write-Host "Grafana" -ForegroundColor Green
+    Write-Host "URL      : http://localhost:3000"
+    Write-Host "Username : $grafanaUsername"
+    Write-Host "Password : $grafanaPassword"
 
-Write-Host ""
-Write-Host "Prometheus" -ForegroundColor Green
-Write-Host "URL            : http://localhost:9090"
-Write-Host "Authentication : Not enabled for this local lab"
+    Write-Host ""
+    Write-Host "Prometheus" -ForegroundColor Green
+    Write-Host "URL            : http://localhost:9090"
+    Write-Host "Authentication : Not enabled for this local lab"
+} else {
+    Write-Host ""
+    Write-Host "Monitoring (Grafana/Prometheus)" -ForegroundColor Yellow
+    Write-Host "[SKIP] monitoring namespace not found - not configured"
+}
 
 Write-Host ""
 Write-Host "The port-forward processes are running in the background."
@@ -269,7 +304,10 @@ Write-Host ".\scripts\close-devops-lab.ps1"
 
 if (-not $NoBrowser) {
     foreach ($endpoint in $endpoints) {
-        Start-Process $endpoint.Url
+        # Only open browser for endpoints in existing namespaces
+        if (Test-NamespaceExists -Namespace $endpoint.Namespace) {
+            Start-Process $endpoint.Url
+        }
     }
 }
 
