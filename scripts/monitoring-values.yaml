@@ -7,8 +7,8 @@ grafana:
 prometheus:
   enabled: true
   serviceMonitorSelectorNilUsesHelmValues: false
-  serviceMonitoringNamspaceSeletor: {}
-  serviceMonitoringSelector: {}
+  serviceMonitorNamespaceSelector: {}
+  serviceMonitorSelector: {}
 
   service:
     type: ClusterIP
