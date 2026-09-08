@@ -88,10 +88,10 @@ helm template fastapi-demo . `
 ```
 
 The GitHub Actions runner performs this schema validation automatically using
-the `ghcr.io/yannh/kubeconform` container. It also installs `kubectl` and runs
-an offline kubectl parse check. No Kubernetes cluster is required for this CI
-job; `kubectl` is used with `--validate=false` because OpenAPI validation
-requires a live cluster.
+the `ghcr.io/yannh/kubeconform` container. It also installs and verifies
+`kubectl`, but does not run `kubectl apply` because that command can still try
+to contact a Kubernetes API server for resource discovery. No Kubernetes
+cluster is required for this CI job.
 
 ## 6. Create the namespace and install
 
