@@ -1,56 +1,51 @@
 param(
-    [string]$ClusterName = "minikube"
+    [Alias("ClusterName")]
+    [string]$Profile = "minikube"
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not (Get-Command minikube -ErrorAction SilentlyContinue)) {
-    throw "Required command 'minikube' was not found in PATH."
-}
+$closeScript = Join-Path `
+    $PSScriptRoot `
+    "close-devops-lab.ps1"
 
-function Get-MinikubeState {
-    param (
-        [string]$ClusterName
-    )
-
-    $statusJson = minikube status -p $ClusterName --output json 2>$null
-
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($statusJson)) {
-        return $null
-    }
-
-    try {
-        $status = $statusJson | ConvertFrom-Json
-        return $status
-    }
-    catch {
-        return $null
-    }
-}
-
-Write-Host "Checking minikube profile '$ClusterName'...." -ForegroundColor Cyan
-
-$minikubeState = Get-MinikubeState -ClusterName $ClusterName
-
-if ($null -eq $minikubeState) {
-    Write-Host "[SKIP] Minikube profile '$ClusterName' does not exist." -ForegroundColor Yellow
-    exit 0
-}
-
-if ($minikubeState.Host -ne "Running") {
-    Write-Host "[SKIP] Minikube is already stopped." -ForegroundColor Yellow
-    exit 0
-}
-
-Write-Host "Stopping minikube..."
-
-minikube stop --profile $ClusterName
-
-if ($LASTEXITCODE -ne 0){
-    throw "minikube failed to stop."
+if (Test-Path $closeScript) {
+    & $closeScript
 }
 
 Write-Host ""
-Write-Host "[OK] Minikube stopped safely." -ForegroundColor Green
-Write-Host "No namespace, application, Helm release, or Argo CD resources were deleted."
-Write-Host "Run .\scripts\start-devops-lab.ps1 to start it again."
+Write-Host "Stopping Minikube profile '$Profile'..." `
+    -ForegroundColor Cyan
+
+$statusOutput = minikube status `
+    --profile $Profile `
+    --output json 2>$null
+
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($statusOutput)) {
+    Write-Host `
+        "[SKIP] Minikube profile '$Profile' does not exist." `
+        -ForegroundColor Yellow
+
+    exit 0
+}
+
+$state = $statusOutput | ConvertFrom-Json
+
+if ($state.Host -ne "Running") {
+    Write-Host "[SKIP] Minikube is already stopped." `
+        -ForegroundColor Yellow
+
+    exit 0
+}
+
+minikube stop --profile $Profile
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Minikube failed to stop."
+}
+
+Write-Host ""
+Write-Host "[OK] Minikube stopped safely." `
+    -ForegroundColor Green
+
+Write-Host "No Kubernetes or Helm resources were deleted."

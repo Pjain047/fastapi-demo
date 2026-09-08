@@ -26,12 +26,16 @@ if ([string]::IsNullOrWhiteSpace($readyReplicas) -or [int]$readyReplicas -lt 1) 
 
 $encodedPassword = kubectl get secret argocd-initial-admin-secret --namespace $ArgoNamespace --output jsonpath="{.data.password}"
 
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($encodedPassword)) {
+    throw "The Argo CD admin password secret is unavailable. Run setup-devops-lab.ps1 first."
+}
+
 $password = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($encodedPassword))
 
 Write-Host ""
 Write-Host "Argo CD URL : https://localhost:$LocalPort" -ForegroundColor Green
-Write-Host "UserName: admin"
-Write-Host "Password(base 64 encode): '$password' " -ForegroundColor Red
+Write-Host "Username    : admin"
+Write-Host "Password    : $password" -ForegroundColor Red
 Write-Host ""
 Write-Host "Keep this PowerShell window open while using the UI."
 Write-Host "Press Ctrl+C to stop port forwarding."

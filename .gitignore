@@ -26,3 +26,6 @@ htmlcov/
 
 # Logs
 *.log
+
+# PowerShell DevOps lab runtime state
+scripts/.state/
