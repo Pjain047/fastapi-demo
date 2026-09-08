@@ -72,11 +72,13 @@ With kubectl:
 
 ```powershell
 helm template fastapi-demo . `
-  --namespace fastapi-demo | kubectl apply --dry-run=client -f -
+  --namespace fastapi-demo | kubectl apply --dry-run=client --validate=false -f -
 ```
 
-This validates the rendered resources against the Kubernetes client schema
-without changing the cluster.
+This checks that kubectl can parse the rendered resources without changing the
+cluster. `--validate=false` is required in CI because GitHub-hosted runners do
+not have a Kubernetes API server from which kubectl can download the OpenAPI
+schema.
 
 For stricter schema validation, install `kubeconform` and run:
 
@@ -84,6 +86,12 @@ For stricter schema validation, install `kubeconform` and run:
 helm template fastapi-demo . `
   --namespace fastapi-demo | kubeconform -strict -summary
 ```
+
+The GitHub Actions runner performs this schema validation automatically using
+the `ghcr.io/yannh/kubeconform` container. It also installs `kubectl` and runs
+an offline kubectl parse check. No Kubernetes cluster is required for this CI
+job; `kubectl` is used with `--validate=false` because OpenAPI validation
+requires a live cluster.
 
 ## 6. Create the namespace and install
 

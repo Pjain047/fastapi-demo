@@ -116,6 +116,17 @@ jobs:
         with:
           version: v3.17.0
 
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
+
+      - name: Verify Kubernetes tooling
+        run: |
+          helm version --short
+          kubectl version --client
+          docker version --format '{{.Server.Version}}'
+
       - name: Lint chart
         id: lint
         continue-on-error: true
@@ -135,7 +146,15 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          kubectl apply --dry-run=client -f helm-rendered.yaml 2>&1 | tee helm-kubectl-validation.txt
+          kubectl apply --dry-run=client --validate=false -f helm-rendered.yaml 2>&1 | tee helm-kubectl-validation.txt
+
+      - name: Validate Kubernetes schemas with kubeconform
+        id: kubeconform
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          docker run --rm -i ghcr.io/yannh/kubeconform:latest \
+            -strict -summary -output text < helm-rendered.yaml 2>&1 | tee helm-kubeconform-validation.txt
 
       - name: Validate Helm result
         id: validation
@@ -143,7 +162,8 @@ jobs:
         run: |
           if [ "${{ steps.lint.outcome }}" != "success" ] || \
              [ "${{ steps.render.outcome }}" != "success" ] || \
-             [ "${{ steps.kubectl.outcome }}" != "success" ]; then
+             [ "${{ steps.kubectl.outcome }}" != "success" ] || \
+             [ "${{ steps.kubeconform.outcome }}" != "success" ]; then
             echo "Helm validation failed"
             exit 1
           fi
@@ -157,6 +177,7 @@ jobs:
             helm-lint.txt
             helm-rendered.yaml
             helm-kubectl-validation.txt
+            helm-kubeconform-validation.txt
           if-no-files-found: warn
 
   report:
